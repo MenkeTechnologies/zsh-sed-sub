@@ -67,6 +67,6 @@ basicSedSub(){
 }
 
 zle -N basicSedSub
-bindkey -M viins '^F^]' basicSedSub
-bindkey -M vicmd '^F^]' basicSedSub
+bindkey -M viins '^F^P' basicSedSub
+bindkey -M vicmd '^F^P' basicSedSub
 
