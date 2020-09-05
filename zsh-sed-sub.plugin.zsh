@@ -1,75 +1,10 @@
-basicSedSub(){
-    emulate -LR zsh
+0="${${0:#$ZSH_ARGZERO}:-${(%):-%N}}"
+0="${${(M)0:#/*}:-$PWD/$0}"
 
-    local sedArg key orig replace
-
-    print -r "$BUFFER" | command egrep -q '\w+' || {
-        zle up-line-or-history
-        #printf "\x1b[1;31m"
-        #zle -R  "Extended Regex Sed Substitution: Empty buffer." && read -k 1
-        #printf "\x1b[0m"
-        #return 1
-    }
-
-    printf "\x1b[1;34m"
-    zle -R "Extended Regex Sed Substitution (original>replaced) (@ not allowed in either string):"
-    printf "\x1b[1;44;37m"
-    read -k key
-    local -r start=$key
-
-    while (( (#key)!=(##\n) && (#key)!=(##\r) )) ; do
-        if (( (#key)==(##\>) ));then
-            printf "\x1b[0;4;1;34m"
-        else
-            printf "\x1b[1;44;37m"
-            print -r "$sedArg" | grep -q '>' && printf \
-                "\x1b[0;1;37;45m"
-        fi
-        if (( (#key)==(##^?) || (#key)==(##^h) ));then
-            sedArg=${sedArg[1,-2]}
-            printf "\x1b[0m"
-        elif (( (#key)==(##^U) ));then
-            sedArg=""
-            printf "\x1b[0m"
-        else
-            if (( (#key)!=(##@) ));then
-                sedArg="${sedArg}$key"
-            fi
-        fi
-        zle -R "Extended Regex Sed Substitution (original>replaced) (@ not allowed in either string): $sedArg"
-        read -k key || return 1
-    done
-
-    if print -r "$sedArg" | grep -q "@"; then
-        printf "\x1b[0;1;31m"
-        zle -R "No '@' allowed! That is the sed delimiter!" && read -k key
-        printf "\x1b[0m"
-        return 1
-    fi
-
-    print -r "$sedArg" | grep -q ">" || {
-        printf "\x1b[0;1;31m"
-        zle -R  "Needed '>' for separation of original regex string and substitution!" && read -k 1
-        printf "\x1b[0m"
-        return 1
-    }
-
-    orig="$(print -r $sedArg | awk -F'>' '{print $1}')"
-    replace="$(print -r $sedArg | awk -F'>' '{print $2}')"
-    sedArg="s@$orig@$replace@g"
-
-    print -r "$BUFFER" | command egrep -q "$orig" || {
-        printf "\x1b[0;1;31m"
-        zle -R  "No Match." && read -k 1
-        printf "\x1b[0m"
-        return 1
-    }
-
-    BUFFER="$(print -r $BUFFER | sed -E "$sedArg")"
-    printf "\x1b[0m"
-}
+# util fns
+fpath+=("${0:h}/autoload")
+autoload -Uz "${0:h}/autoload/"*(.:t)
 
 zle -N basicSedSub
 bindkey -M viins '^F^P' basicSedSub
 bindkey -M vicmd '^F^P' basicSedSub
-
