@@ -6,12 +6,8 @@ basicSedSub(){
 
     local sedArg key orig replace
 
-    if ! [[ "$BUFFER" =~ '\w+' ]]; then
+    if test -z "$BUFFER" || [[ "$BUFFER" == [[:space:]]# ]]; then
         zle up-line-or-history
-        #printf "\x1b[1;31m"
-        #zle -R  "Zsh-BsS: Extended Regex Sed Substitution: Empty buffer." && read -k 1
-        #printf "\x1b[0m"
-        #return 1
     fi
 
     printf "\x1b[1;34m"
@@ -46,6 +42,7 @@ basicSedSub(){
     done
 
     if [[ "$sedArg" != *'>'* ]]; then
+        printf "\x1b[0;1;31m"
         zle -R  "Zsh-BsS: Needed '>' for separation of original regex string and substitution!" && read -k 1
         printf "\x1b[0m"
         return 1
