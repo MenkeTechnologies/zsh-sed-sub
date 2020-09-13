@@ -17,6 +17,12 @@ basicSedSub(){
     local -r start=$key
 
     while (( (#key) != (##\n) && (#key) != (##\r) )) ; do
+
+        if (( (#key) == (##\e) ));then
+            printf "\x1b[0m"
+            return 1
+        fi
+
         if (( (#key) == (##\>) ));then
             printf "\x1b[0;4;1;34m"
         else
@@ -61,8 +67,8 @@ basicSedSub(){
         return 1
     fi
 
-    BUFFER="$(print -r -- $BUFFER | sed -E -- "$sedArg")"
     printf "\x1b[0m"
+    BUFFER="$(print -r -- $BUFFER | sed -E -- "$sedArg")"
 }
 
 basicSedSub "$@"
