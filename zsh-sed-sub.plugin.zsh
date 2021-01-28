@@ -6,5 +6,7 @@ fpath+=("${0:h}/autoload")
 autoload -Uz "${0:h}/autoload/"*(.:t)
 
 zle -N basicSedSub
+
 bindkey -M viins '^F^P' basicSedSub
 bindkey -M vicmd '^F^P' basicSedSub
+bindkey -M emacs '^F^P' basicSedSub
