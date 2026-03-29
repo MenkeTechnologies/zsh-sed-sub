@@ -1,6 +1,8 @@
 # zsh-sed-sub
 # created by MenkeTechnologies
 
+[![CI](https://github.com/MenkeTechnologies/zsh-sed-sub/actions/workflows/ci.yml/badge.svg)](https://github.com/MenkeTechnologies/zsh-sed-sub/actions/workflows/ci.yml)
+
 
 This plugin adds 2 keybindings to do global search and replace on current command line.  Try it out with Ctrl-F Ctrl-P.
 
