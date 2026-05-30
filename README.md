@@ -16,7 +16,7 @@
 
 > *"`Ctrl-F Ctrl-P` — rewrite the current line in place."*
 
-This plugin adds 2 keybindings to do global search and replace on current command line.  Try it out with Ctrl-F Ctrl-P.
+This plugin adds a ZLE keybinding (`Ctrl-F Ctrl-P`, registered in viins/vicmd/emacs keymaps) to do global search and replace on the current command line.  Try it out with Ctrl-F Ctrl-P.
 
 ### [`strykelang`](https://github.com/MenkeTechnologies/strykelang) &middot; [`zshrs`](https://github.com/MenkeTechnologies/zshrs) · [`MenkeTechnologiesMeta`](https://github.com/MenkeTechnologies/MenkeTechnologiesMeta) · [`zsh-git-acp`](https://github.com/MenkeTechnologies/zsh-git-acp) · [`zsh-sudo`](https://github.com/MenkeTechnologies/zsh-sudo) · [`zsh-more-completions`](https://github.com/MenkeTechnologies/zsh-more-completions) · [`zpwr`](https://github.com/MenkeTechnologies/zpwr)
 
