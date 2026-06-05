@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <meta name="description" content="zsh-sed-sub — Engineering report. ZLE widget for global sed-style search/replace on the current command-line BUFFER. 74-LOC autoload + 12-LOC entrypoint, Ctrl-F Ctrl-P bound in viins/vicmd/emacs keymaps, single-keystroke read loop with ESC abort + ^U erase, @-delimited s/// rewrite. 44 zunit @test cases.">
+  <title>zsh-sed-sub &mdash; Engineering Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&amp;family=Share+Tech+Mono&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="hud-static.css">
+  <link rel="stylesheet" href="tutorial.css">
+  <style>
+    .tutorial-main { max-width: 70rem; }
+    .bar-wrap { background:var(--bg-primary);border:1px solid var(--border);border-radius:2px;height:18px;position:relative;overflow:hidden; }
+    .bar-fill { height:100%;border-radius:1px;transition:width 1.2s cubic-bezier(.22,1,.36,1); }
+    .bar-fill.green  { background:linear-gradient(90deg,#39ff14,#20c00a);box-shadow:0 0 8px rgba(57,255,20,.4); }
+    .bar-fill.cyan   { background:linear-gradient(90deg,#05d9e8,#0891b2);box-shadow:0 0 8px rgba(5,217,232,.4); }
+    .bar-fill.magenta{ background:linear-gradient(90deg,#d300c5,#a000a0);box-shadow:0 0 8px rgba(211,0,197,.35); }
+    .bar-pct { position:absolute;right:6px;top:0;line-height:18px;font-size:10px;font-weight:700;color:#fff;text-shadow:0 0 4px #000;font-family:'Orbitron',sans-serif; }
+    .file-table { width:100%;border-collapse:collapse;margin:0.6rem 0;font-size:12px; }
+    .file-table th { background:var(--bg-secondary);color:var(--cyan);font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;text-align:left;padding:7px 10px;border:1px solid var(--border); }
+    .file-table td { padding:6px 10px;border:1px solid var(--border);color:var(--text-dim);vertical-align:middle; }
+    .file-table tr:hover td { background:var(--bg-hover); }
+    .file-table td:first-child { font-family:'Share Tech Mono',monospace;color:var(--accent-light);font-weight:600;white-space:nowrap; }
+    .file-table .num { text-align:right;font-family:'Share Tech Mono',monospace; }
+    .file-table .total-row td { background:var(--bg-secondary);font-weight:700;color:var(--text);border-top:2px solid var(--cyan); }
+    .file-table code { font-size:11px;color:var(--accent-light);background:var(--bg-primary);padding:1px 4px;border-radius:2px; }
+    .stat-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(13rem,1fr));gap:0.75rem;margin:1.2rem 0; }
+    .stat-card { border:1px solid var(--border);border-top:3px solid var(--cyan);background:var(--bg-card);padding:1rem 1.2rem;border-radius:2px;text-align:center; }
+    .stat-card .stat-val { font-family:'Orbitron',sans-serif;font-size:26px;font-weight:900;color:var(--cyan);line-height:1.1;text-shadow:0 0 20px var(--cyan-glow); }
+    .stat-card .stat-val.accent { color:var(--accent);text-shadow:0 0 20px var(--accent-glow); }
+    .stat-card .stat-val.green  { color:var(--green);text-shadow:0 0 20px rgba(57,255,20,.3); }
+    .stat-card .stat-label { font-family:'Orbitron',sans-serif;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-top:0.5rem; }
+    @keyframes glow-pulse { 0%,100%{text-shadow:0 0 20px var(--cyan-glow)}50%{text-shadow:0 0 40px var(--cyan-glow),0 0 80px var(--cyan-dim)} }
+    .stat-card .stat-val { animation:glow-pulse 3s ease-in-out infinite; }
+    .mapping-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(20rem,1fr));gap:0.65rem;margin:0.8rem 0; }
+    .mapping-card { border:1px solid var(--border);border-left:3px solid var(--magenta);background:var(--bg-card);padding:0.6rem 0.9rem;border-radius:2px; }
+    .mapping-card h4 { font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--magenta);margin:0 0 0.3rem; }
+    .mapping-card p { margin:0;font-size:11px;color:var(--text-dim);line-height:1.5; }
+    .mapping-card code { font-size:10.5px;color:var(--accent-light);background:var(--bg-primary);padding:1px 4px;border-radius:2px; }
+    .section-rule { border:none;border-top:1px dashed var(--border);margin:2rem 0; }
+    .feature-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(22rem,1fr));gap:0.65rem;margin:0.8rem 0; }
+    .feature-card { border:1px solid var(--border);border-left:3px solid var(--cyan);background:var(--bg-card);padding:0.7rem 1rem;border-radius:2px; }
+    .feature-card h4 { font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--cyan);margin:0 0 0.3rem; }
+    .feature-card p { margin:0;font-size:11px;color:var(--text-dim);line-height:1.55; }
+    .feature-card code { font-size:10.5px;color:var(--accent-light);background:var(--bg-primary);padding:1px 4px;border-radius:2px; }
+    pre.flow { margin:0.5rem 0;padding:1rem;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-dim);font-size:11px;line-height:1.55;overflow-x:auto;font-family:'Share Tech Mono',monospace; }
+  </style>
+</head>
+<body>
+  <div class="app tutorial-app" id="reportApp">
+    <div class="crt-scanline" id="crtH" aria-hidden="true"></div>
+    <div class="crt-scanline-v" id="crtV" aria-hidden="true"></div>
+
+    <header class="tutorial-header">
+      <div class="tutorial-header-inner">
+        <div>
+          <h1 class="tutorial-brand">// ZSH-SED-SUB &mdash; ENGINEERING REPORT</h1>
+          <nav class="tutorial-crumbs" aria-label="Breadcrumb">
+            <span class="current">Engineering Report</span>
+            <span class="sep">/</span>
+            <a href="index.html">Docs</a>
+            <span class="sep">/</span>
+            <a href="https://github.com/MenkeTechnologies/zsh-sed-sub" target="_blank" rel="noopener noreferrer">GitHub</a>
+            <span class="sep">/</span>
+            <a href="https://github.com/MenkeTechnologies/zpwr" target="_blank" rel="noopener noreferrer">zpwr</a>
+          </nav>
+          <p style="margin:0.35rem 0 0;font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-dim);letter-spacing:0.03em;opacity:0.75;">
+            zsh plugin &middot; ZLE widget &middot; <code>Ctrl-F Ctrl-P</code> bound in viins / vicmd / emacs &middot; global sed-style rewrite of the current <code>$BUFFER</code> &middot; single-keystroke read loop
+          </p>
+        </div>
+        <div class="tutorial-toolbar">
+          <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
+          <button type="button" class="btn btn-secondary active" id="btnCrt" title="CRT scanline overlay">CRT</button>
+          <button type="button" class="btn btn-secondary active" id="btnNeon" title="Neon border pulse">Neon</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="tutorial-main">
+
+      <!-- ═══════════════════════════════════════ -->
+      <!-- SECTION 1: EXECUTIVE SUMMARY           -->
+      <!-- ═══════════════════════════════════════ -->
+      <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>EXECUTIVE SUMMARY</h2>
+      <p class="tutorial-subtitle">zsh-sed-sub adds one ZLE widget &mdash; <code>basicSedSub</code> &mdash; bound to <code>Ctrl-F Ctrl-P</code> across all three default zsh keymaps (viins / vicmd / emacs). When invoked, the widget reads a <code>before&gt;after</code> sed expression a single keystroke at a time via <code>read -k</code>, paints the prompt-line buffer in ANSI cyan/magenta to indicate edit state, and on Enter rewrites the entire <code>$BUFFER</code> via <code>sed -E "s@before@after@g"</code>. Backspace deletes one char, <code>Ctrl-U</code> clears the input, <code>ESC</code> aborts. The widget is the canonical "fix the typo in this long command line" tool &mdash; the same intent as Emacs <code>query-replace</code>, but at the zsh command-line layer rather than the editor layer. 74 LOC of autoload code, 12 LOC of entrypoint, 44 zunit @test cases across 6 files pinning the keybinding, widget registration, the auto-up trigger on empty BUFFER, and the entire interactive flow.</p>
+
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-val">86</div><div class="stat-label">Plugin LOC</div></div>
+        <div class="stat-card"><div class="stat-val accent">1</div><div class="stat-label">ZLE Widget</div></div>
+        <div class="stat-card"><div class="stat-val">3</div><div class="stat-label">Keymaps Bound</div></div>
+        <div class="stat-card"><div class="stat-val">1</div><div class="stat-label">Keybinding (^F^P)</div></div>
+        <div class="stat-card"><div class="stat-val green">44</div><div class="stat-label">zunit @test Cases</div></div>
+        <div class="stat-card"><div class="stat-val">6</div><div class="stat-label">Test Files</div></div>
+        <div class="stat-card"><div class="stat-val">21</div><div class="stat-label">Docs/Repo Gates</div></div>
+        <div class="stat-card"><div class="stat-val">37</div><div class="stat-label">Git Commits</div></div>
+      </div>
+
+      <div style="margin:1.2rem 0;">
+        <p style="font-size:11px;color:var(--text-muted);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;font-family:'Orbitron',sans-serif;font-weight:700;">Plugin Source &mdash; 86 LOC</p>
+        <div class="bar-wrap" style="height:24px;">
+          <div class="bar-fill cyan" style="width:86%;"></div>
+          <span class="bar-pct" style="font-size:12px;">74 widget body / 12 entrypoint &middot; 86% widget</span>
+        </div>
+        <p style="font-size:10px;color:var(--text-muted);margin-top:4px;">All real logic lives in <code>autoload/basicSedSub</code> (74 LOC). The entrypoint (12 LOC) only configures <code>fpath</code>, autoloads the widget, calls <code>zle -N basicSedSub</code> to register it, and emits three identical <code>bindkey -M</code> lines for viins, vicmd, and emacs &mdash; the user's current keymap doesn't matter.</p>
+      </div>
+
+      <hr class="section-rule">
+
+      <!-- ═══════════════════════════════════════ -->
+      <!-- SECTION 2: FILE STRUCTURE              -->
+      <!-- ═══════════════════════════════════════ -->
+      <h2 class="tutorial-title"><span class="step-hash">#</span>FILE STRUCTURE</h2>
+      <table class="file-table">
+        <thead><tr><th>File</th><th class="num">Lines</th><th>Role</th></tr></thead>
+        <tbody>
+          <tr><td>autoload/basicSedSub</td><td class="num">74</td><td>ZLE widget: empty-BUFFER guard, read-loop with per-keystroke colour state machine, ESC/^?/^h/^U handling, <code>&gt;</code>-delimiter check, <code>@</code>-escape, <code>s@orig@replace@g</code> dispatch, no-match guard, BUFFER rewrite via <code>print -r -- $BUFFER | sed -E -- "$sedArg"</code></td></tr>
+          <tr><td>zsh-sed-sub.plugin.zsh</td><td class="num">12</td><td>Entrypoint: <code>fpath</code> append, <code>autoload -Uz</code>, <code>zle -N basicSedSub</code>, three <code>bindkey -M {viins,vicmd,emacs} '^F^P' basicSedSub</code> lines</td></tr>
+        </tbody>
+        <tfoot><tr class="total-row"><td>2 source files</td><td class="num">86</td><td>1 widget + 1 entrypoint</td></tr></tfoot>
+      </table>
+
+      <hr class="section-rule">
+
+      <!-- ═══════════════════════════════════════ -->
+      <!-- SECTION 3: WIDGET FLOW                  -->
+      <!-- ═══════════════════════════════════════ -->
+      <h2 class="tutorial-title"><span class="step-hash">@</span>WIDGET FLOW</h2>
+      <p class="tutorial-subtitle">The widget body is a single read loop with three exit conditions: Enter (commit), ESC (abort), <code>&gt;</code>-missing on Enter (error and abort). On commit it rewrites the entire <code>$BUFFER</code> via a sed subshell. State lives in three locals: <code>sedArg</code> (the accumulating <code>before&gt;after</code> string), <code>orig</code> (split <code>${sedArg%%&gt;*}</code>), <code>replace</code> (split <code>${sedArg##*&gt;}</code>).</p>
+
+      <pre class="flow">
+  ^F^P pressed (any keymap)
+       │
+       ▼
+  ┌────────────────────────────────────┐
+  │ emulate -LR zsh                    │ ← local-scope zsh emulation,
+  │                                    │   no interference from
+  │                                    │   user's setopt
+  └────────────┬───────────────────────┘
+               │
+               ▼
+  ┌────────────────────────────────────┐
+  │ BUFFER empty / whitespace-only?    │
+  └────────────┬───────────────────────┘
+       │ yes                    │ no
+       ▼                        │
+  zle up-line-or-history        │
+  (pull last command for edit)  │
+       │                        │
+       └────────────┬───────────┘
+                    ▼
+  ┌────────────────────────────────────┐
+  │ paint "Zsh-BsS: ..." status banner │ ← \x1b[1;34m underline
+  │ enter colored read mode            │   \x1b[1;44;37m bg-blue
+  └────────────┬───────────────────────┘
+               │
+               ▼
+  ┌────────────────────────────────────┐
+  │ LOOP:  read -k key                 │
+  │   key == \n / \r?  → break (commit)│
+  │   key == ESC?      → return 1      │
+  │   key == \x7f|^h?  → backspace     │
+  │   key == ^U?       → clear sedArg  │
+  │   key == '&gt;'?      → flip color    │
+  │   else             → append to sedArg │
+  │   zle -R "...: $sedArg"            │ ← live preview redraw
+  └────────────┬───────────────────────┘
+               │
+               ▼ (commit)
+  ┌────────────────────────────────────┐
+  │ sedArg contains '&gt;'?               │
+  │   no  → "Needed '&gt;'" error, abort  │
+  │   yes → split on &gt; into orig, replace │
+  └────────────┬───────────────────────┘
+               │
+               ▼
+  ┌────────────────────────────────────┐
+  │ Escape '@' in orig + replace       │ ← so we can use @ as
+  │ sedArg = "s@$orig@$replace@g"      │   the sed delimiter
+  └────────────┬───────────────────────┘
+               │
+               ▼
+  ┌────────────────────────────────────┐
+  │ BUFFER contains orig?              │
+  │   no  → "No Match." error, abort   │
+  └────────────┬───────────────────────┘
+               │ yes
+               ▼
+  ┌────────────────────────────────────┐
+  │ BUFFER = print -r -- $BUFFER |     │
+  │            sed -E -- "$sedArg"     │
+  └────────────────────────────────────┘</pre>
+
+      <hr class="section-rule">
+
+      <!-- ═══════════════════════════════════════ -->
+      <!-- SECTION 4: KEYSTROKE TABLE              -->
+      <!-- ═══════════════════════════════════════ -->
+      <h2 class="tutorial-title"><span class="step-hash">$</span>KEYSTROKE TABLE</h2>
+      <p class="tutorial-subtitle">Inside the read loop, the widget interprets six specific keystrokes; every other byte is appended to the accumulating <code>sedArg</code> buffer.</p>
+
+      <table class="file-table">
+        <thead><tr><th>Keystroke</th><th>Code</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td>Enter</td><td><code>\n</code> / <code>\r</code></td><td>Commit: split on <code>&gt;</code>, build <code>s@orig@replace@g</code>, run sed, write BUFFER</td></tr>
+          <tr><td>ESC</td><td><code>\e</code></td><td>Abort. Clear ANSI state, <code>return 1</code> &mdash; BUFFER untouched</td></tr>
+          <tr><td>Backspace</td><td><code>^?</code> / <code>^h</code></td><td>Drop the last char of <code>sedArg</code> via <code>${sedArg[1,-2]}</code></td></tr>
+          <tr><td>^U</td><td><code>^U</code></td><td>Clear <code>sedArg</code> entirely; start over without leaving the widget</td></tr>
+          <tr><td><code>&gt;</code></td><td><code>&gt;</code></td><td>Append + flip ANSI: switches the live preview into the magenta &ldquo;you're now typing the replacement&rdquo; mode</td></tr>
+          <tr><td>(any other)</td><td>&mdash;</td><td>Appended to <code>sedArg</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="font-family:'Orbitron',sans-serif;font-size:11px;color:var(--accent);letter-spacing:1.5px;margin:1.5rem 0 0.5rem;">// CHARACTER COMPARISON IDIOM</h3>
+      <p style="font-size:11px;color:var(--text-muted);">All key tests use zsh's numeric-character syntax: <code>(( (#key) == (##\n) ))</code>, <code>(( (#key) == (##\e) ))</code>, <code>(( (#key) == (##^U) ))</code>. <code>$((#x))</code> evaluates to the code point of the first character of <code>$x</code>; <code>$((##c))</code> evaluates to the code point of the literal character <code>c</code> in the source. The pattern is the canonical zsh way to write keystroke matches without string-quoting the control character.</p>
+
+      <hr class="section-rule">
+
+      <!-- ═══════════════════════════════════════ -->
+      <!-- SECTION 5: DELIMITER STRATEGY           -->
+      <!-- ═══════════════════════════════════════ -->
+      <h2 class="tutorial-title"><span class="step-hash">&amp;</span>DELIMITER STRATEGY</h2>
+      <p class="tutorial-subtitle">The widget uses <code>&gt;</code> as the user-facing delimiter between the search and replace halves &mdash; that's why the syntax is <code>orig&gt;replace</code>, not <code>orig/replace</code>. Internally, the sed expression uses <code>@</code> as its delimiter because <code>@</code> is rare in command-line contexts. The widget escapes any literal <code>@</code> in either half before assembling the final <code>s@orig@replace@g</code> expression.</p>
+
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h4>User-facing delimiter: <code>&gt;</code></h4>
+          <p><code>&gt;</code> is rare in typed-search strings (vs <code>/</code> which appears in every path). The widget paints the live preview a different colour after the first <code>&gt;</code> so the user always knows which side they're typing.</p>
+        </div>
+        <div class="feature-card">
+          <h4>Internal sed delimiter: <code>@</code></h4>
+          <p><code>s@orig@replace@g</code> instead of the traditional <code>s/orig/replace/g</code>. Paths and URLs frequently contain <code>/</code>; using <code>@</code> avoids forcing the user to escape forward slashes in either half.</p>
+        </div>
+        <div class="feature-card">
+          <h4><code>@</code>-escape pass</h4>
+          <p>If the user types a literal <code>@</code> in either half, <code>${orig//@/\\@}</code> + <code>${replace//@/\\@}</code> escape it before assembly so the sed delimiter still parses correctly.</p>
+        </div>
+        <div class="feature-card">
+          <h4>Global flag baked in</h4>
+          <p>The trailing <code>g</code> in <code>s@...@...@g</code> is hard-coded. The widget exists to fix every occurrence on the line; partial replacement is what cursor-edit is for. Single-occurrence sed substitution is one keystroke away from <code>g</code>-substitution anyway.</p>
+        </div>
+      </div>
+
+      <hr class="section-rule">
+
+      <!-- ═══════════════════════════════════════ -->
+      <!-- SECTION 6: STATE MACHINE                -->
+      <!-- ═══════════════════════════════════════ -->
+      <h2 class="tutorial-title"><span class="step-hash">~</span>STATE MACHINE</h2>
+      <p class="tutorial-subtitle">The widget runs a 3-colour ANSI state machine on the prompt line. The colour conveys which phase the user is in, with zero help text required.</p>
+
+      <table class="file-table">
+        <thead><tr><th>State</th><th>ANSI</th><th>When</th></tr></thead>
+        <tbody>
+          <tr><td>Banner</td><td><code>\x1b[1;34m</code> (bold blue)</td><td>Initial prompt header line</td></tr>
+          <tr><td>Typing 'orig'</td><td><code>\x1b[1;44;37m</code> (blue bg, white fg)</td><td>Before any <code>&gt;</code> has been pressed</td></tr>
+          <tr><td>Delimiter pulse</td><td><code>\x1b[0;4;1;34m</code> (underlined bold blue)</td><td>The frame that <code>&gt;</code> is pressed</td></tr>
+          <tr><td>Typing 'replace'</td><td><code>\x1b[0;1;37;45m</code> (magenta bg, white fg)</td><td>After <code>&gt;</code> has been pressed, while typing the replacement</td></tr>
+          <tr><td>Backspace / ^U flash</td><td><code>\x1b[0m</code> (reset)</td><td>Brief reset on destructive edit so the user sees the change land</td></tr>
+          <tr><td>Error</td><td><code>\x1b[0;1;31m</code> (bold red)</td><td>"Needed '<code>&gt;</code>'" or "No Match." messages</td></tr>
+        </tbody>
+      </table>
+
+      <hr class="section-rule">
+
+      <!-- ═══════════════════════════════════════ -->
+      <!-- SECTION 7: KEYBINDING SURFACE           -->
+      <!-- ═══════════════════════════════════════ -->
+      <h2 class="tutorial-title"><span class="step-hash">!</span>KEYBINDING SURFACE</h2>
+      <p class="tutorial-subtitle">One chord, three keymaps. The plugin runs <code>bindkey -M viins '^F^P' basicSedSub</code>, then again for <code>vicmd</code>, then again for <code>emacs</code>. The user's <code>bindkey -v</code> / <code>bindkey -e</code> choice doesn't matter; the keybinding fires from every default keymap.</p>
+
+      <table class="file-table">
+        <thead><tr><th>Keymap</th><th>When active</th><th>Binding</th></tr></thead>
+        <tbody>
+          <tr><td>viins</td><td>vi insert mode (after <code>i</code> / <code>a</code> / etc.)</td><td><code>^F^P</code> &rarr; <code>basicSedSub</code></td></tr>
+          <tr><td>vicmd</td><td>vi command mode (after ESC)</td><td><code>^F^P</code> &rarr; <code>basicSedSub</code></td></tr>
+          <tr><td>emacs</td><td>emacs mode (the default for most users)</td><td><code>^F^P</code> &rarr; <code>basicSedSub</code></td></tr>
+        </tbody>
+      </table>
+
+      <p style="font-size:11px;color:var(--text-muted);margin-top:0.5rem;">The chord <code>^F^P</code> was chosen because neither <code>^F</code> nor <code>^P</code> alone is rebound to <code>basicSedSub</code>; each remains free for their default ZLE actions (<code>forward-char</code>, <code>up-line-or-history</code>). The widget itself uses <code>zle up-line-or-history</code> to pre-load the previous command into <code>$BUFFER</code> when invoked on an empty prompt &mdash; an inline mirror of <code>^P</code>'s default behaviour.</p>
+
+      <hr class="section-rule">
+
+      <!-- ═══════════════════════════════════════ -->
+      <!-- SECTION 8: TEST COVERAGE                -->
+      <!-- ═══════════════════════════════════════ -->
+      <h2 class="tutorial-title"><span class="step-hash">*</span>TEST COVERAGE</h2>
+      <p class="tutorial-subtitle">44 zunit <code>@test</code> cases across 6 test files. <code>t-plugin.zsh</code> is the heaviest at 23 cases &mdash; it spawns a sub-shell, sources the plugin, drives the widget with stubbed <code>read</code> input, and asserts the resulting <code>$BUFFER</code>. The other files pin structural contracts: keybinding presence in all 3 keymaps, widget registration, autoload coverage, syntax cleanliness, and the entrypoint stem.</p>
+
+      <table class="file-table">
+        <thead><tr><th>Test file</th><th class="num">@test</th><th>Pins</th></tr></thead>
+        <tbody>
+          <tr><td>tests/t-plugin.zsh</td><td class="num">23</td><td>End-to-end widget drive: <code>orig&gt;replace</code> rewrites BUFFER; backspace edits; <code>^U</code> clears; ESC aborts; missing <code>&gt;</code> emits error; no-match leaves BUFFER untouched; empty BUFFER triggers up-line; <code>@</code>-escape in either half</td></tr>
+          <tr><td>tests/t-contract2.zsh</td><td class="num">6</td><td><code>zle -N basicSedSub</code> registers the widget; <code>basicSedSub</code> appears in <code>$widgets</code>; <code>bindkey</code> for <code>^F^P</code> in viins / vicmd / emacs all resolve to <code>basicSedSub</code></td></tr>
+          <tr><td>tests/t-contract3.zsh</td><td class="num">5</td><td>Idempotent re-source: re-sourcing the plugin doesn't double-register; <code>fpath</code> doesn't grow per source</td></tr>
+          <tr><td>tests/t-contract4.zsh</td><td class="num">5</td><td>Entrypoint stem matches plugin directory; <code>autoload/basicSedSub</code> file exists; widget name matches filename</td></tr>
+          <tr><td>tests/t-contract.zsh</td><td class="num">3</td><td>Entrypoint parses cleanly under <code>zsh -n</code>; every <code>_*</code> completion file (vacuously zero) starts with <code>#compdef</code></td></tr>
+          <tr><td>tests/t-syntax.zsh</td><td class="num">2</td><td>Every <code>autoload/*</code> + entrypoint parses under <code>zsh -n</code></td></tr>
+        </tbody>
+        <tfoot><tr class="total-row"><td>6 zunit files</td><td class="num">44</td><td>+ 21 <code>.sh</code> doc-hygiene gates</td></tr></tfoot>
+      </table>
+
+      <hr class="section-rule">
+
+      <!-- ═══════════════════════════════════════ -->
+      <!-- SECTION 9: KEY DESIGN DECISIONS         -->
+      <!-- ═══════════════════════════════════════ -->
+      <h2 class="tutorial-title"><span class="step-hash">?</span>KEY DESIGN DECISIONS</h2>
+      <p class="tutorial-subtitle">Each call-out is a decision the implementation could have gone either way on, with the rationale for the path taken.</p>
+
+      <div class="feature-grid">
+        <div class="feature-card"><h4>Custom read loop, not <code>vared</code></h4><p>The widget could have used <code>vared</code> to edit a temporary line. Instead it runs a per-keystroke <code>read -k</code> loop because the goal is <strong>visible state transitions on the prompt</strong>: colour flips, live preview, immediate ESC abort. <code>vared</code> would either buffer too much or commit too early.</p></div>
+        <div class="feature-card"><h4>Sed, not zsh substitution</h4><p>Zsh has <code>${BUFFER//orig/replace}</code> built in, but that's a literal-string substitution. The widget routes through <code>sed -E</code> so the user gets full extended-regex semantics &mdash; capture groups, character classes, anchors &mdash; without a parser of its own.</p></div>
+        <div class="feature-card"><h4><code>&gt;</code> as delimiter</h4><p>Picked because: (a) rare in typed input, (b) easy to type without a modifier, (c) visually asymmetric so users always know they're past the split point, (d) the colour flip on press makes the role unambiguous.</p></div>
+        <div class="feature-card"><h4>3-keymap binding</h4><p>One <code>zle -N</code> + three identical <code>bindkey -M</code> lines. The user's vi/emacs keymap choice doesn't change the keybinding; the chord is the same everywhere. Trades 2 lines of entrypoint code for zero user confusion.</p></div>
+        <div class="feature-card"><h4>Empty-BUFFER auto-up</h4><p>If invoked on an empty prompt, the widget calls <code>zle up-line-or-history</code> to pull the previous command into the BUFFER first. The common case is "I just typed something with a typo, hit Enter, want to fix it" &mdash; this collapses that into one chord.</p></div>
+        <div class="feature-card"><h4>Bold-red error states</h4><p>Two error paths: <code>&gt;</code> missing on Enter, and <code>orig</code> not present in BUFFER. Both repaint the status line in bold red and wait for any keystroke before resetting. Forces the user to acknowledge the error rather than silently dropping the input.</p></div>
+        <div class="feature-card"><h4><code>emulate -LR zsh</code></h4><p>First line of the widget body. Resets all setopt state to the canonical zsh defaults for the duration of the function (the <code>L</code>) and after the function ends restores the user's options (the <code>R</code>). No user <code>setopt</code> can break the widget's logic.</p></div>
+        <div class="feature-card"><h4>Single autoload file</h4><p>The widget body is a single autoload file with its own trailing self-call so the file is both autoloadable (via <code>autoload -Uz</code>) and directly source-able. No registry, no manifest &mdash; just <code>fpath</code> + <code>zle -N</code>.</p></div>
+      </div>
+
+      <hr class="section-rule">
+
+      <!-- ═══════════════════════════════════════ -->
+      <!-- SECTION 10: STRATEGIC POSITION          -->
+      <!-- ═══════════════════════════════════════ -->
+      <h2 class="tutorial-title"><span class="step-hash">.</span>STRATEGIC POSITION</h2>
+      <p class="tutorial-subtitle">The smallest meaningful widget in the MenkeTechnologies plugin stack &mdash; 86 LOC for a single-chord command-line transform. It's the canonical example of "zsh extensibility lets you carve out a specific friction point and obliterate it." Adjacent plugins in the stack (<code>zsh-sudo</code>, <code>zsh-git-acp</code>, <code>zsh-expand</code>) follow the same shape: one chord, one fn, one BUFFER rewrite.</p>
+
+      <div class="mapping-grid">
+        <div class="mapping-card"><h4>Long-line edit</h4><p>The canonical use case: a 200-character pipeline with one wrong arg. Rather than mash arrow keys, <code>^F^P arg&gt;rightarg</code> rewrites it in one chord.</p></div>
+        <div class="mapping-card"><h4>Repeated typo</h4><p>A path or variable typo'd 5 times in the same command. Sed-substitution fixes all 5 in one rewrite; manual edit costs N round-trips.</p></div>
+        <div class="mapping-card"><h4>Quick refactor</h4><p>"Last command was right but for the wrong host." <code>^P</code> to pull it back, <code>^F^P olddc&gt;newdc</code> to rewrite.</p></div>
+        <div class="mapping-card"><h4>Plugin stack hub</h4><p>One of the 5 zsh plugins under <code>MenkeTechnologiesMeta</code>; pairs naturally with <code>zsh-sudo</code> (sudo prepend), <code>zsh-expand</code> (alias expand), and <code>zsh-git-acp</code> (one-chord commit) as command-line transforms.</p></div>
+      </div>
+
+      <hr class="section-rule">
+
+      <!-- ═══════════════════════════════════════ -->
+      <!-- SECTION 11: LOAD MODEL                  -->
+      <!-- ═══════════════════════════════════════ -->
+      <h2 class="tutorial-title"><span class="step-hash">+</span>LOAD MODEL</h2>
+      <p class="tutorial-subtitle">The plugin's source-time work is: 1 <code>fpath</code> append, 1 <code>autoload -Uz</code>, 1 <code>zle -N</code>, 3 <code>bindkey -M</code> calls. Total work: well under a millisecond on any zsh. The widget body itself doesn't run until the user actually presses <code>^F^P</code>.</p>
+
+      <table class="file-table">
+        <thead><tr><th>Step</th><th>When</th><th>Cost</th></tr></thead>
+        <tbody>
+          <tr><td><code>fpath+=("${0:h}/autoload")</code></td><td>source time</td><td>negligible</td></tr>
+          <tr><td><code>autoload -Uz "${0:h}/autoload/"*(.:t)</code></td><td>source time</td><td>Glob + 1 autoload register</td></tr>
+          <tr><td><code>zle -N basicSedSub</code></td><td>source time</td><td>1 widget registration</td></tr>
+          <tr><td>3 <code>bindkey -M</code> lines</td><td>source time</td><td>3 keymap updates</td></tr>
+          <tr><td>First <code>^F^P</code></td><td>user-driven</td><td>Autoload triggers, fn body runs to completion when user hits Enter</td></tr>
+        </tbody>
+      </table>
+
+      <hr class="section-rule">
+
+      <!-- ═══════════════════════════════════════ -->
+      <!-- SECTION 12: COMPAT                      -->
+      <!-- ═══════════════════════════════════════ -->
+      <h2 class="tutorial-title"><span class="step-hash">^</span>COMPAT</h2>
+      <p style="font-size:11px;color:var(--text-muted);margin-top:0.5rem;">Hard deps: <code>zsh</code> (with ZLE; the widget assumes interactive zsh), <code>sed</code> (BSD or GNU; the <code>-E</code> flag is portable across both). No optional deps. Compat floor is zsh 5.x &mdash; no zsh 6 features. The widget uses zsh's numeric-character syntax (<code>$((#x))</code>) which has been stable since the 4.x line.</p>
+
+      <p style="font-size:11px;color:var(--text-muted);">If <code>^F^P</code> conflicts with the user's existing keybindings, they can rebind: <code>bindkey -r '^F^P'</code> followed by a custom <code>bindkey '...' basicSedSub</code>. The widget name doesn't move; only the chord does.</p>
+
+    </main>
+
+    <footer style="text-align:center;padding:2rem;font-size:10px;color:var(--text-muted);font-family:'Orbitron',sans-serif;letter-spacing:2px;">
+      ZSH-SED-SUB ENGINEERING REPORT &middot; 86 PLUGIN LOC &middot; 1 ZLE WIDGET &middot; 3 KEYMAPS &middot; CTRL-F CTRL-P &middot; 44 ZUNIT TESTS &middot; 21 DOC GATES &middot; MENKETECHNOLOGIES
+    </footer>
+  </div>
+
+  <script>
+    const html = document.documentElement;
+    const btnTheme = document.getElementById('btnTheme');
+    const btnCrt = document.getElementById('btnCrt');
+    const btnNeon = document.getElementById('btnNeon');
+    const crtH = document.getElementById('crtH');
+    const crtV = document.getElementById('crtV');
+    btnTheme?.addEventListener('click', () => {
+      html.setAttribute('data-theme', html.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
+    });
+    btnCrt?.addEventListener('click', () => {
+      btnCrt.classList.toggle('active');
+      const on = btnCrt.classList.contains('active');
+      if (crtH) crtH.style.display = on ? '' : 'none';
+      if (crtV) crtV.style.display = on ? '' : 'none';
+    });
+    btnNeon?.addEventListener('click', () => {
+      btnNeon.classList.toggle('active');
+      document.querySelector('.app')?.classList.toggle('neon-off');
+    });
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('.bar-fill').forEach(bar => {
+        const w = bar.style.width;
+        bar.style.width = '0';
+        requestAnimationFrame(() => { requestAnimationFrame(() => { bar.style.width = w; }); });
+      });
+    });
+  </script>
+</body>
+</html>
