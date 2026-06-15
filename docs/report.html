@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <meta name="description" content="zsh-sed-sub — Engineering report. ZLE widget for global sed-style search/replace on the current command-line BUFFER. 74-LOC autoload + 12-LOC entrypoint, Ctrl-F Ctrl-P bound in viins/vicmd/emacs keymaps, single-keystroke read loop with ESC abort + ^U erase, @-delimited s/// rewrite. 44 zunit @test cases.">
+  <meta name="description" content="zsh-sed-sub — Engineering report. ZLE widget for global sed-style search/replace on the current command-line BUFFER. 74-LOC autoload + 12-LOC entrypoint, Ctrl-F Ctrl-P bound in viins/vicmd/emacs keymaps, single-keystroke read loop with ESC abort + ^U erase, @-delimited s/// rewrite. 46 zunit @test cases.">
   <title>zsh-sed-sub &mdash; Engineering Report</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -85,17 +85,17 @@
       <!-- SECTION 1: EXECUTIVE SUMMARY           -->
       <!-- ═══════════════════════════════════════ -->
       <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>EXECUTIVE SUMMARY</h2>
-      <p class="tutorial-subtitle">zsh-sed-sub adds one ZLE widget &mdash; <code>basicSedSub</code> &mdash; bound to <code>Ctrl-F Ctrl-P</code> across all three default zsh keymaps (viins / vicmd / emacs). When invoked, the widget reads a <code>before&gt;after</code> sed expression a single keystroke at a time via <code>read -k</code>, paints the prompt-line buffer in ANSI cyan/magenta to indicate edit state, and on Enter rewrites the entire <code>$BUFFER</code> via <code>sed -E "s@before@after@g"</code>. Backspace deletes one char, <code>Ctrl-U</code> clears the input, <code>ESC</code> aborts. The widget is the canonical "fix the typo in this long command line" tool &mdash; the same intent as Emacs <code>query-replace</code>, but at the zsh command-line layer rather than the editor layer. 74 LOC of autoload code, 12 LOC of entrypoint, 44 zunit @test cases across 6 files pinning the keybinding, widget registration, the auto-up trigger on empty BUFFER, and the entire interactive flow.</p>
+      <p class="tutorial-subtitle">zsh-sed-sub adds one ZLE widget &mdash; <code>basicSedSub</code> &mdash; bound to <code>Ctrl-F Ctrl-P</code> across all three default zsh keymaps (viins / vicmd / emacs). When invoked, the widget reads a <code>before&gt;after</code> sed expression a single keystroke at a time via <code>read -k</code>, paints the prompt-line buffer in ANSI cyan/magenta to indicate edit state, and on Enter rewrites the entire <code>$BUFFER</code> via <code>sed -E "s@before@after@g"</code>. Backspace deletes one char, <code>Ctrl-U</code> clears the input, <code>ESC</code> aborts. The widget is the canonical "fix the typo in this long command line" tool &mdash; the same intent as Emacs <code>query-replace</code>, but at the zsh command-line layer rather than the editor layer. 74 LOC of autoload code, 12 LOC of entrypoint, 46 zunit @test cases across 7 files pinning the keybinding, widget registration, the auto-up trigger on empty BUFFER, and the entire interactive flow.</p>
 
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-val">86</div><div class="stat-label">Plugin LOC</div></div>
         <div class="stat-card"><div class="stat-val accent">1</div><div class="stat-label">ZLE Widget</div></div>
         <div class="stat-card"><div class="stat-val">3</div><div class="stat-label">Keymaps Bound</div></div>
         <div class="stat-card"><div class="stat-val">1</div><div class="stat-label">Keybinding (^F^P)</div></div>
-        <div class="stat-card"><div class="stat-val green">44</div><div class="stat-label">zunit @test Cases</div></div>
-        <div class="stat-card"><div class="stat-val">6</div><div class="stat-label">Test Files</div></div>
+        <div class="stat-card"><div class="stat-val green">46</div><div class="stat-label">zunit @test Cases</div></div>
+        <div class="stat-card"><div class="stat-val">7</div><div class="stat-label">Test Files</div></div>
         <div class="stat-card"><div class="stat-val">21</div><div class="stat-label">Docs/Repo Gates</div></div>
-        <div class="stat-card"><div class="stat-val">37</div><div class="stat-label">Git Commits</div></div>
+        <div class="stat-card"><div class="stat-val">41</div><div class="stat-label">Git Commits</div></div>
       </div>
 
       <div style="margin:1.2rem 0;">
@@ -288,7 +288,7 @@
       <!-- SECTION 8: TEST COVERAGE                -->
       <!-- ═══════════════════════════════════════ -->
       <h2 class="tutorial-title"><span class="step-hash">*</span>TEST COVERAGE</h2>
-      <p class="tutorial-subtitle">44 zunit <code>@test</code> cases across 6 test files. <code>t-plugin.zsh</code> is the heaviest at 23 cases &mdash; it spawns a sub-shell, sources the plugin, drives the widget with stubbed <code>read</code> input, and asserts the resulting <code>$BUFFER</code>. The other files pin structural contracts: keybinding presence in all 3 keymaps, widget registration, autoload coverage, syntax cleanliness, and the entrypoint stem.</p>
+      <p class="tutorial-subtitle">46 zunit <code>@test</code> cases across 7 test files. <code>t-plugin.zsh</code> is the heaviest at 23 cases &mdash; it spawns a sub-shell, sources the plugin, drives the widget with stubbed <code>read</code> input, and asserts the resulting <code>$BUFFER</code>. The other files pin structural contracts: keybinding presence in all 3 keymaps, widget registration, autoload coverage, syntax cleanliness, and the entrypoint stem.</p>
 
       <table class="file-table">
         <thead><tr><th>Test file</th><th class="num">@test</th><th>Pins</th></tr></thead>
@@ -299,8 +299,9 @@
           <tr><td>tests/t-contract4.zsh</td><td class="num">5</td><td>Entrypoint stem matches plugin directory; <code>autoload/basicSedSub</code> file exists; widget name matches filename</td></tr>
           <tr><td>tests/t-contract.zsh</td><td class="num">3</td><td>Entrypoint parses cleanly under <code>zsh -n</code>; every <code>_*</code> completion file (vacuously zero) starts with <code>#compdef</code></td></tr>
           <tr><td>tests/t-syntax.zsh</td><td class="num">2</td><td>Every <code>autoload/*</code> + entrypoint parses under <code>zsh -n</code></td></tr>
+          <tr><td>tests/t-transform-pipeline.zsh</td><td class="num">2</td><td>sed-transform round-trips: <code>@</code> in both pattern and replacement (delimiter not unbalanced); multi-byte UTF-8 pattern matches through <code>sed -E</code> without byte-mode split</td></tr>
         </tbody>
-        <tfoot><tr class="total-row"><td>6 zunit files</td><td class="num">44</td><td>+ 21 <code>.sh</code> doc-hygiene gates</td></tr></tfoot>
+        <tfoot><tr class="total-row"><td>7 zunit files</td><td class="num">46</td><td>+ 21 <code>.sh</code> doc-hygiene gates</td></tr></tfoot>
       </table>
 
       <hr class="section-rule">
@@ -369,7 +370,7 @@
     </main>
 
     <footer style="text-align:center;padding:2rem;font-size:10px;color:var(--text-muted);font-family:'Orbitron',sans-serif;letter-spacing:2px;">
-      ZSH-SED-SUB ENGINEERING REPORT &middot; 86 PLUGIN LOC &middot; 1 ZLE WIDGET &middot; 3 KEYMAPS &middot; CTRL-F CTRL-P &middot; 44 ZUNIT TESTS &middot; 21 DOC GATES &middot; MENKETECHNOLOGIES
+      ZSH-SED-SUB ENGINEERING REPORT &middot; 86 PLUGIN LOC &middot; 1 ZLE WIDGET &middot; 3 KEYMAPS &middot; CTRL-F CTRL-P &middot; 46 ZUNIT TESTS &middot; 21 DOC GATES &middot; MENKETECHNOLOGIES
     </footer>
   </div>
 
