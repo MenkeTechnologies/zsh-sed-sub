@@ -90,9 +90,107 @@ source zsh-sed-sub/zsh-sed-sub.plugin.zsh</pre>
         <h2>Key bindings</h2>
         <table class="example-tbl">
           <tbody>
-            <tr><td><code>Ctrl-F Ctrl-P</code></td><td>global sed-style substitution on the current buffer &mdash; prompts for pattern and replacement, rewrites <code>BUFFER</code> in place</td></tr>
+            <tr><td><code>Ctrl-F Ctrl-P</code></td><td>global sed-style substitution on the current buffer &mdash; prompts for pattern and replacement, rewrites <code>BUFFER</code> in place. Bound in the <code>viins</code>, <code>vicmd</code>, and <code>emacs</code> keymaps, so it fires regardless of <code>bindkey -v</code> / <code>bindkey -e</code></td></tr>
           </tbody>
         </table>
+      </section>
+
+      <section class="tutorial-section">
+        <h2>Usage</h2>
+        <p>Press <code>Ctrl-F Ctrl-P</code> with a command on the line. A status banner appears:
+        <code>Zsh-BsS: Extended Regex Sed Substitution (original&gt;replaced):</code>. Type the search pattern,
+        then a literal <code>&gt;</code>, then the replacement, then <kbd>Enter</kbd>. The widget builds
+        <code>s@original@replacement@g</code> and runs it over the whole line with <code>sed -E</code>, so the
+        pattern is an extended regular expression and every match on the line is replaced.</p>
+        <p>The <code>&gt;</code> character is the separator between the two halves. When you press <code>&gt;</code> the
+        live preview flips colour (blue background &rarr; magenta background) so you always know which side you are
+        typing. If you press <kbd>Enter</kbd> without ever typing a <code>&gt;</code>, the widget refuses with
+        <code>Needed '&gt;' for separation of original regex string and substitution!</code> and leaves the line
+        untouched.</p>
+        <p>If the current line is empty or whitespace-only when you invoke the chord, the widget first runs
+        <code>zle up-line-or-history</code> to pull the previous command back onto the line, then prompts &mdash; so
+        "I just ran that, now fix the typo" is a single chord.</p>
+      </section>
+
+      <section class="tutorial-section">
+        <h2>Editing keys (inside the prompt)</h2>
+        <p>While typing the <code>original&gt;replacement</code> expression, these keys are interpreted; every other
+        byte is appended to the expression:</p>
+        <table class="example-tbl">
+          <tbody>
+            <tr><td><kbd>Enter</kbd></td><td>Commit. Split on the first <code>&gt;</code>, build <code>s@orig@replace@g</code>, run <code>sed -E</code>, write the result back to <code>BUFFER</code></td></tr>
+            <tr><td><kbd>Esc</kbd></td><td>Abort. Reset ANSI colours and <code>return 1</code>; the line is left exactly as it was</td></tr>
+            <tr><td><kbd>Backspace</kbd> / <kbd>Ctrl-H</kbd></td><td>Delete the last character of the expression (<code>${sedArg[1,-2]}</code>)</td></tr>
+            <tr><td><kbd>Ctrl-U</kbd></td><td>Clear the whole expression and start over without leaving the widget</td></tr>
+            <tr><td><code>&gt;</code></td><td>Separator between search and replacement; flips the preview colour to the replacement state</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="tutorial-section">
+        <h2>Examples</h2>
+        <p>In each case the command line already holds the "before" text; you press <code>Ctrl-F Ctrl-P</code>, type the
+        middle column, and press <kbd>Enter</kbd> to get the "after".</p>
+        <table class="example-tbl">
+          <tbody>
+            <tr><td><code>echo foo bar foo</code></td><td><code>foo&gt;baz</code></td><td>&rarr; <code>echo baz bar baz</code> &mdash; every <code>foo</code> is replaced (the <code>g</code> flag is always on)</td></tr>
+            <tr><td><code>ssh web01 uptime</code></td><td><code>web01&gt;web02</code></td><td>&rarr; <code>ssh web02 uptime</code> &mdash; re-target the last command at a different host</td></tr>
+            <tr><td><code>cp /var/log/a /var/log/b</code></td><td><code>/var/log&gt;/tmp</code></td><td>&rarr; <code>cp /tmp/a /tmp/b</code> &mdash; the <code>@</code> sed delimiter means forward slashes need no escaping</td></tr>
+            <tr><td><code>git checkout main</code></td><td><code>checkout&gt;switch</code></td><td>&rarr; <code>git switch main</code> &mdash; swap a subcommand in place</td></tr>
+            <tr><td><code>foo123 foo456</code></td><td><code>foo[0-9]+&gt;X</code></td><td>&rarr; <code>X X</code> &mdash; the pattern is a full <code>sed -E</code> extended regex</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="tutorial-section">
+        <h2>How it works</h2>
+        <p>The plugin ships one autoload function, <code>basicSedSub</code> (<code>autoload/basicSedSub</code>), registered
+        as a ZLE widget with <code>zle -N basicSedSub</code>. The function:</p>
+        <ol>
+          <li>runs <code>emulate -LR zsh</code> so the user's <code>setopt</code> settings can't change its behaviour;</li>
+          <li>if <code>BUFFER</code> is empty/whitespace, pulls the previous command with <code>zle up-line-or-history</code>;</li>
+          <li>reads the expression one keystroke at a time with <code>read -k</code>, redrawing a live preview via <code>zle -R</code>;</li>
+          <li>requires a <code>&gt;</code> separator, then splits into <code>orig=${sedArg%%&gt;*}</code> and <code>replace=${sedArg##*&gt;}</code>;</li>
+          <li>escapes any literal <code>@</code> in each half (<code>${orig//@/\@}</code>) so <code>@</code> can be used as the sed delimiter;</li>
+          <li>checks the pattern is present in the line (else <code>No Match.</code> and abort);</li>
+          <li>rewrites the line: <code>BUFFER="$(print -r -- $BUFFER | sed -E -- "s@orig@replace@g")"</code>.</li>
+        </ol>
+        <p>The entrypoint <code>zsh-sed-sub.plugin.zsh</code> only appends the <code>autoload</code> directory to <code>fpath</code>,
+        autoloads the function, registers the widget, and binds <code>^F^P</code> in all three keymaps. No work runs at
+        shell-startup time beyond that &mdash; the widget body executes only when you press the chord.</p>
+      </section>
+
+      <section class="tutorial-section">
+        <h2>Rebinding</h2>
+        <p>The chord and the widget are independent. To move the binding off <code>^F^P</code>:</p>
+<pre># drop the default chord, bind your own
+bindkey -r '^F^P'
+bindkey '^X^S' basicSedSub      # repeat for -M viins / -M vicmd as desired</pre>
+        <p>The widget name (<code>basicSedSub</code>) never changes; only the key that triggers it does.</p>
+      </section>
+
+      <section class="tutorial-section">
+        <h2>Requirements</h2>
+        <ul>
+          <li>An interactive <code>zsh</code> with ZLE (the widget reads keystrokes and rewrites <code>BUFFER</code>).</li>
+          <li><code>sed</code> &mdash; BSD or GNU; the <code>-E</code> extended-regex flag is portable across both.</li>
+        </ul>
+        <p>No other dependencies. The keystroke comparisons use zsh's numeric-character syntax (<code>$((#x))</code>),
+        which has been stable across the zsh 5.x line.</p>
+      </section>
+
+      <section class="tutorial-section">
+        <h2>Troubleshooting</h2>
+        <table class="example-tbl">
+          <tbody>
+            <tr><td>Nothing happens on <code>Ctrl-F Ctrl-P</code></td><td>Another binding may own <code>^F^P</code>. Check with <code>bindkey '^F^P'</code>; it should print <code>basicSedSub</code>. Re-source the plugin or rebind (see above).</td></tr>
+            <tr><td><code>Needed '&gt;' for separation...</code></td><td>You pressed <kbd>Enter</kbd> without a <code>&gt;</code> in the expression. The format is <code>pattern&gt;replacement</code>.</td></tr>
+            <tr><td><code>No Match.</code></td><td>The search pattern doesn't occur in the current line, so nothing was changed. Check the regex (it is interpreted as <code>sed -E</code>).</td></tr>
+            <tr><td>Replacing a literal <code>@</code></td><td>Supported &mdash; <code>@</code> in either half is escaped automatically before it is used as the internal sed delimiter.</td></tr>
+          </tbody>
+        </table>
+        <p>For the full keystroke-by-keystroke flow, ANSI state machine, and test coverage, see the
+        <a href="report.html">Engineering Report</a>.</p>
       </section>
 
       <section class="tutorial-section">

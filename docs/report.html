@@ -95,7 +95,7 @@
         <div class="stat-card"><div class="stat-val green">46</div><div class="stat-label">zunit @test Cases</div></div>
         <div class="stat-card"><div class="stat-val">7</div><div class="stat-label">Test Files</div></div>
         <div class="stat-card"><div class="stat-val">21</div><div class="stat-label">Docs/Repo Gates</div></div>
-        <div class="stat-card"><div class="stat-val">41</div><div class="stat-label">Git Commits</div></div>
+        <div class="stat-card"><div class="stat-val">42</div><div class="stat-label">Git Commits</div></div>
       </div>
 
       <div style="margin:1.2rem 0;">
@@ -322,6 +322,26 @@
         <div class="feature-card"><h4><code>emulate -LR zsh</code></h4><p>First line of the widget body. Resets all setopt state to the canonical zsh defaults for the duration of the function (the <code>L</code>) and after the function ends restores the user's options (the <code>R</code>). No user <code>setopt</code> can break the widget's logic.</p></div>
         <div class="feature-card"><h4>Single autoload file</h4><p>The widget body is a single autoload file with its own trailing self-call so the file is both autoloadable (via <code>autoload -Uz</code>) and directly source-able. No registry, no manifest &mdash; just <code>fpath</code> + <code>zle -N</code>.</p></div>
       </div>
+
+      <hr class="section-rule">
+
+      <!-- ═══════════════════════════════════════ -->
+      <!-- SECTION 9b: WORKED EXAMPLES             -->
+      <!-- ═══════════════════════════════════════ -->
+      <h2 class="tutorial-title"><span class="step-hash">&gt;</span>WORKED EXAMPLES</h2>
+      <p class="tutorial-subtitle">Each row: the line already on the prompt, the <code>original&gt;replacement</code> string typed after <code>^F^P</code>, the internal sed expression the widget assembles, and the resulting <code>$BUFFER</code>. The <code>g</code> flag is always present, so every match on the line is replaced.</p>
+
+      <table class="file-table">
+        <thead><tr><th>BUFFER before</th><th>Typed</th><th>Assembled</th><th>BUFFER after</th></tr></thead>
+        <tbody>
+          <tr><td><code>echo foo bar foo</code></td><td><code>foo&gt;baz</code></td><td><code>s@foo@baz@g</code></td><td><code>echo baz bar baz</code></td></tr>
+          <tr><td><code>ssh web01 uptime</code></td><td><code>web01&gt;web02</code></td><td><code>s@web01@web02@g</code></td><td><code>ssh web02 uptime</code></td></tr>
+          <tr><td><code>cp /var/log/a /var/log/b</code></td><td><code>/var/log&gt;/tmp</code></td><td><code>s@/var/log@/tmp@g</code></td><td><code>cp /tmp/a /tmp/b</code></td></tr>
+          <tr><td><code>foo123 foo456</code></td><td><code>foo[0-9]+&gt;X</code></td><td><code>s@foo[0-9]+@X@g</code></td><td><code>X X</code></td></tr>
+          <tr><td><code>user@host file</code></td><td><code>user&gt;root</code></td><td><code>s@user@root@g</code> (literal <code>@</code> in BUFFER untouched)</td><td><code>root@host file</code></td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:11px;color:var(--text-muted);margin-top:0.5rem;">Because the search half is fed straight to <code>sed -E</code>, the pattern is a POSIX extended regular expression: character classes (<code>[0-9]</code>), quantifiers (<code>+</code>, <code>*</code>), anchors (<code>^</code>, <code>$</code>), and capture groups all work. Only literal <code>@</code> typed by the user is escaped before assembly; everything else is passed through verbatim.</p>
 
       <hr class="section-rule">
 
