@@ -20,6 +20,8 @@ This plugin adds a ZLE keybinding (`Ctrl-F Ctrl-P`, registered in viins/vicmd/em
 
 ### [`strykelang`](https://github.com/MenkeTechnologies/strykelang) &middot; [`zshrs`](https://github.com/MenkeTechnologies/zshrs) · [`MenkeTechnologiesMeta`](https://github.com/MenkeTechnologies/MenkeTechnologiesMeta) · [`zsh-git-acp`](https://github.com/MenkeTechnologies/zsh-git-acp) · [`zsh-sudo`](https://github.com/MenkeTechnologies/zsh-sudo) · [`zsh-more-completions`](https://github.com/MenkeTechnologies/zsh-more-completions) · [`zpwr`](https://github.com/MenkeTechnologies/zpwr)
 
+### [`Read the Docs`](https://menketechnologies.github.io/zsh-sed-sub/) &middot; [`Engineering Report`](https://menketechnologies.github.io/zsh-sed-sub/report.html)
+
 ---
 
 ## Table of Contents
