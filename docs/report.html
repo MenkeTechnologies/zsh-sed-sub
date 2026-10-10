@@ -85,7 +85,7 @@
       <!-- SECTION 1: EXECUTIVE SUMMARY           -->
       <!-- ═══════════════════════════════════════ -->
       <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>EXECUTIVE SUMMARY</h2>
-      <p class="tutorial-subtitle">zsh-sed-sub adds one ZLE widget &mdash; <code>basicSedSub</code> &mdash; bound to <code>Ctrl-F Ctrl-P</code> across all three default zsh keymaps (viins / vicmd / emacs). When invoked, the widget reads a <code>before&gt;after</code> sed expression a single keystroke at a time via <code>read -k</code>, paints the prompt-line buffer in ANSI cyan/magenta to indicate edit state, and on Enter rewrites the entire <code>$BUFFER</code> via <code>sed -E "s@before@after@g"</code>. Backspace deletes one char, <code>Ctrl-U</code> clears the input, <code>ESC</code> aborts. The widget is the canonical "fix the typo in this long command line" tool &mdash; the same intent as Emacs <code>query-replace</code>, but at the zsh command-line layer rather than the editor layer. 74 LOC of autoload code, 12 LOC of entrypoint, 46 zunit @test cases across 7 files pinning the keybinding, widget registration, the auto-up trigger on empty BUFFER, and the entire interactive flow.</p>
+      <p class="tutorial-subtitle">zsh-sed-sub adds one ZLE widget &mdash; <code>basicSedSub</code> &mdash; bound to <code>Ctrl-F Ctrl-P</code> across all three default zsh keymaps (viins / vicmd / emacs). When invoked, the widget reads a <code>before&gt;after</code> sed expression a single keystroke at a time via <code>read -k</code>, paints the prompt-line buffer in ANSI blue/magenta to indicate edit state, and on Enter rewrites the entire <code>$BUFFER</code> via <code>sed -E "s@before@after@g"</code>. Backspace deletes one char, <code>Ctrl-U</code> clears the input, <code>ESC</code> aborts. The widget is the canonical "fix the typo in this long command line" tool &mdash; the same intent as Emacs <code>query-replace</code>, but at the zsh command-line layer rather than the editor layer. 74 LOC of autoload code, 12 LOC of entrypoint, 46 zunit @test cases across 7 files pinning the keybinding, widget registration, the auto-up trigger on empty BUFFER, and the entire interactive flow.</p>
 
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-val">86</div><div class="stat-label">Plugin LOC</div></div>
@@ -95,7 +95,6 @@
         <div class="stat-card"><div class="stat-val green">46</div><div class="stat-label">zunit @test Cases</div></div>
         <div class="stat-card"><div class="stat-val">7</div><div class="stat-label">Test Files</div></div>
         <div class="stat-card"><div class="stat-val">21</div><div class="stat-label">Docs/Repo Gates</div></div>
-        <div class="stat-card"><div class="stat-val">45</div><div class="stat-label">Git Commits</div></div>
       </div>
 
       <div style="margin:1.2rem 0;">
@@ -319,7 +318,7 @@
         <div class="feature-card"><h4>3-keymap binding</h4><p>One <code>zle -N</code> + three identical <code>bindkey -M</code> lines. The user's vi/emacs keymap choice doesn't change the keybinding; the chord is the same everywhere. Trades 2 lines of entrypoint code for zero user confusion.</p></div>
         <div class="feature-card"><h4>Empty-BUFFER auto-up</h4><p>If invoked on an empty prompt, the widget calls <code>zle up-line-or-history</code> to pull the previous command into the BUFFER first. The common case is "I just typed something with a typo, hit Enter, want to fix it" &mdash; this collapses that into one chord.</p></div>
         <div class="feature-card"><h4>Bold-red error states</h4><p>Two error paths: <code>&gt;</code> missing on Enter, and <code>orig</code> not present in BUFFER. Both repaint the status line in bold red and wait for any keystroke before resetting. Forces the user to acknowledge the error rather than silently dropping the input.</p></div>
-        <div class="feature-card"><h4><code>emulate -LR zsh</code></h4><p>First line of the widget body. Resets all setopt state to the canonical zsh defaults for the duration of the function (the <code>L</code>) and after the function ends restores the user's options (the <code>R</code>). No user <code>setopt</code> can break the widget's logic.</p></div>
+        <div class="feature-card"><h4><code>emulate -LR zsh</code></h4><p>First line of the widget body. <code>-R</code> resets all options to the zsh defaults; <code>-L</code> makes that local to the function, so the user's options are restored when it returns. No user <code>setopt</code> can break the widget's logic.</p></div>
         <div class="feature-card"><h4>Single autoload file</h4><p>The widget body is a single autoload file with its own trailing self-call so the file is both autoloadable (via <code>autoload -Uz</code>) and directly source-able. No registry, no manifest &mdash; just <code>fpath</code> + <code>zle -N</code>.</p></div>
       </div>
 
@@ -349,13 +348,13 @@
       <!-- SECTION 10: STRATEGIC POSITION          -->
       <!-- ═══════════════════════════════════════ -->
       <h2 class="tutorial-title"><span class="step-hash">.</span>STRATEGIC POSITION</h2>
-      <p class="tutorial-subtitle">The smallest meaningful widget in the MenkeTechnologies plugin stack &mdash; 86 LOC for a single-chord command-line transform. It's the canonical example of "zsh extensibility lets you carve out a specific friction point and obliterate it." Adjacent plugins in the stack (<code>zsh-sudo</code>, <code>zsh-git-acp</code>, <code>zsh-expand</code>) follow the same shape: one chord, one fn, one BUFFER rewrite.</p>
+      <p class="tutorial-subtitle">A single-chord command-line transform in 86 LOC. Adjacent plugins in the stack (<code>zsh-sudo</code>, <code>zsh-git-acp</code>, <code>zsh-expand</code>) follow the same shape: one chord, one fn, one BUFFER rewrite.</p>
 
       <div class="mapping-grid">
         <div class="mapping-card"><h4>Long-line edit</h4><p>The canonical use case: a 200-character pipeline with one wrong arg. Rather than mash arrow keys, <code>^F^P arg&gt;rightarg</code> rewrites it in one chord.</p></div>
         <div class="mapping-card"><h4>Repeated typo</h4><p>A path or variable typo'd 5 times in the same command. Sed-substitution fixes all 5 in one rewrite; manual edit costs N round-trips.</p></div>
         <div class="mapping-card"><h4>Quick refactor</h4><p>"Last command was right but for the wrong host." <code>^P</code> to pull it back, <code>^F^P olddc&gt;newdc</code> to rewrite.</p></div>
-        <div class="mapping-card"><h4>Plugin stack hub</h4><p>One of the 5 zsh plugins under <code>MenkeTechnologiesMeta</code>; pairs naturally with <code>zsh-sudo</code> (sudo prepend), <code>zsh-expand</code> (alias expand), and <code>zsh-git-acp</code> (one-chord commit) as command-line transforms.</p></div>
+        <div class="mapping-card"><h4>Plugin stack hub</h4><p>One of the zsh plugins under <code>MenkeTechnologiesMeta</code>; pairs naturally with <code>zsh-sudo</code> (sudo prepend), <code>zsh-expand</code> (alias expand), and <code>zsh-git-acp</code> (one-chord commit) as command-line transforms.</p></div>
       </div>
 
       <hr class="section-rule">
